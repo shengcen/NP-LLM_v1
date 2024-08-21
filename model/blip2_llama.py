@@ -29,35 +29,7 @@ test_mood = False
 level_a = 7
 level_b = 30
 level_c = 10
-
-fiber_cost = []
-ip_cost = []
-
-# flow_num = 100
-# node_num = 30
-# link_num = 300
-
-window_size = 2
-
-flow_num = 30
-node_num = 20
-link_num = 80
-
-SEED_A = 3
-
-random.seed(SEED_A)
-
-dmd_max = 2000
-
-# cap_max = 3000
-# mini_unit = 100
-mini_unit = 500
-max_fiber = 3
-capacity_per_fiber = 1000
-
-from_list = []
-to_list = []
-overall_list = []
+# level_c = 1
 
 def to_label(targets):
     answer = []
@@ -126,6 +98,9 @@ def my_level(raw, min_val, max_val, num):
     final = 0
     gran = (max_val-min_val)/num
 
+    if gran == 0:
+        return 0
+
     final = (raw // gran) - (min_val // gran)
     if final > num-1:
         final = num -1
@@ -134,17 +109,79 @@ def my_level(raw, min_val, max_val, num):
     return final
 
 
+
+
+fiber_cost = []
+ip_cost = []
+
+# flow_num = 100
+# node_num = 30
+# link_num = 300
+
+window_size = 2
+
+# flow_num = 30
+# node_num = 20
+# link_num = 80
+
+# flow_num = 6
+# node_num = 7
+# link_num = 20
+
+# opt: 87500#
+# flow_num = 25
+# node_num = 7
+# link_num = 30
+
+# # ## opt: 87500
+# flow_num = 30
+# node_num = 15
+# link_num = 100
+
+flow_num = 20
+node_num = 30
+link_num = 300
+
+
+dmd_max = 2000
+
+# cap_max = 3000
+# mini_unit = 100
+mini_unit = 500
+max_fiber = 3
+capacity_per_fiber = 1000
+
+
+# SEED_A = 3
+SEED_A = 0
+
+
+
+
+
+
+# fiber_cost = 100
+random.seed(SEED_A)
+
+from_list = []
+to_list = []
+overall_list = []
+
+
 i = 0
 while i < link_num:
     my_from = random.randint(0, node_num-1)
     my_to = random.randint(0, node_num-1)
     if my_to == my_from:
         my_to = (my_to + 1) % node_num
-    if [my_from, my_to] not in overall_list:
+    if ([my_from, my_to] not in overall_list) and ([my_to, my_from] not in overall_list):
         overall_list.append([my_from,my_to])
+        overall_list.append([my_to, my_from])
         from_list.append(my_from)
         to_list.append(my_to)
-        i += 1
+        from_list.append(my_to)
+        to_list.append(my_from)
+        i += 2
 # exit(0)
 
 # for i in range(node_num):
@@ -160,11 +197,14 @@ while i < link_num:
 
 
 ## fiber cost 在那个范围之间分布
-for i in range(len(from_list)):
+for i in range(link_num//2):
     # random.seed(time.time())
     # fiber_cost.append(random.randint(100,200))
-    fiber_cost.append(0)
+    # fiber_cost.append(0)
     ip_cost.append(random.randint(1,10))
+    ## 双向ip cost相等
+    # ip_cost.append(1)
+
 
 
 
@@ -188,6 +228,7 @@ for i in range(flow_num):
     # random.seed(time.time())
     ## dmd 在哪些地方 浮动
     dmd_list.append(random.randint(100, 2000))
+    # dmd_list.append(1000)
 
     # print(src_list[i])
     # print(dst_list[i])
@@ -206,13 +247,7 @@ my_link = {"from":from_list, "to":to_list}
 my_node = list(range(node_num))
 
 ## abandoned
-# dmd_max = 6000
-#
-# cap_max = 3000
-# # mini_unit = 100
-# mini_unit = 500
-# max_fiber = 3
-# capacity_per_fiber = 1000
+
 
 out_dict = {}
 
@@ -234,16 +269,69 @@ for i in range(len(my_node)):
             in_link_idx.append(link_idx)
     in_dict[str(i)] = in_link_idx
 
+## new
+my_path = []
+Gbase = nx.DiGraph()
+Gbase.add_nodes_from(my_node)
+edge_list = []
+for i in range(len(from_list)):
+    # edge_list.append((from_list[i],to_list[i]))
+    Gbase.add_weighted_edges_from([(from_list[i],to_list[i],{'weight':ip_cost[i//2]})])
+
+def get_k_shortest_paths(graph, source, target, k):
+    paths = nx.shortest_simple_paths(graph, source, target)
+    shortest_paths = []
+    for path in paths:
+        shortest_paths.append(path)
+        if len(shortest_paths) == k:
+            break
+    return shortest_paths
+
+
+# my_path: [[[a,b],[b,c],]
+for i in range(flow_num):
+    my_path.append([])
+    curr_flow = i
+    k_shortest_paths = get_k_shortest_paths(Gbase, source=my_flow["src"][curr_flow], target=my_flow["dst"][curr_flow],k=4)
+    for i, path in enumerate(k_shortest_paths):
+        my_path[-1].append(path)
+
+
+max_link_list = [0 for i in range(link_num//2)]
+used_set = set()
+for curr_flow in range(flow_num):
+    for path in range(len(my_path[curr_flow])):
+        # print(my_path[curr_flow][path])
+        for node in range(len(my_path[curr_flow][path])-1):
+            # used_set.add((my_path[curr_flow][path][node],my_path[curr_flow][path][node+1]))
+            for link in range(link_num//2):
+                if (my_link["from"][link*2]==my_path[curr_flow][path][node] and my_link["to"][link*2]==my_path[curr_flow][path][node+1]) or \
+                        (my_link["to"][link*2]==my_path[curr_flow][path][node] and my_link["from"][link*2]==my_path[curr_flow][path][node+1]):
+                    max_link_list[link] += my_flow["dmd"][curr_flow]
+                    break
+
+
 def transformed_edge_index(link_num, my_link):
     edge_index_from = []
     edge_index_to = []
 
-    for s in range(link_num):
-        target = my_link["to"][s]
-        for cand in range(link_num):
-            if (not (s == cand)) and target == my_link["from"][cand]:
-                edge_index_from.append(s)
-                edge_index_to.append(cand)
+    for s in range(link_num // 2):
+        for j in range(link_num // 2):
+            if not (s == j):
+                node_a = my_link["from"][s * 2]
+                node_b = my_link["to"][s * 2]
+                node_c = my_link["from"][j * 2]
+                node_d = my_link["to"][j * 2]
+                if (node_a == node_c) or (node_a == node_d) or (node_b == node_c) or (node_b == node_d):
+                    edge_index_from.append(s)
+                    edge_index_to.append(j)
+
+    # for s in range(link_num):
+    #     target = my_link["to"][s]
+    #     for cand in range(link_num):
+    #         if (not (s == cand)) and target == my_link["from"][cand]:
+    #             edge_index_from.append(s)
+    #             edge_index_to.append(cand)
     edge_index = [edge_index_from, edge_index_to]
     edge_index = torch.tensor(edge_index, dtype=torch.long)
     return edge_index, len(edge_index_from)
@@ -290,119 +378,98 @@ def transformed_edge_index(link_num, my_link):
 
 # dmd_max:flow最大的demand情况
 
-def my_solver_LP(my_flow, my_link, my_node,link_num,flow_num,dmd_max,allocated_capacity):
+def my_solver_LP(ip_cost,my_flow, my_link, my_node,link_num,flow_num,dmd_max,my_path,allocated_capacity):
     # flow_cnt = len(my_flow["src"])
     # link_cnt = len(my_link["from"])
     # node_cnt = len(my_node)
 
     initial_LP = gp.Model('initial LP')
 
-    out_dict = {}
+    flow_cnt = len(my_flow["src"])
+    link_cnt = len(my_link["from"])
+    node_cnt = len(my_node)
 
-    for i in range(len(my_node)):
-        out_dict[str(i)] = []
-        out_link_idx = []
-        for link_idx in range(len(my_link["from"])):
-            if my_link["from"][link_idx] == i:
-                out_link_idx.append(link_idx)
-        out_dict[str(i)] = out_link_idx
-
-    in_dict = {}
-
-    for i in range(len(my_node)):
-        in_dict[str(i)] = []
-        in_link_idx = []
-        for link_idx in range(len(my_link["to"])):
-            if my_link["to"][link_idx] == i:
-                in_link_idx.append(link_idx)
-        in_dict[str(i)] = in_link_idx
-
-    x = [[0 for j in range(flow_num)] for i in range(link_num)]
+    # x = [[0 for j in range(flow_cnt)] for i in range(link_cnt)]
+    # x[i][j]: allocated data rate of i^th flow's j^th path
+    x = [[0 for j in range(4)] for i in range(flow_cnt)]
+    f = [[0 for j in range(link_cnt)] for i in range(flow_cnt)]
 
     # for i in range(link_cnt*flow_cnt):  # 创建两个决策变量
     #     # 下界lb为0，上界ub为正无穷，变量类型vtype为连续型，变量名称name为x0和x1
     #     x[i] = initial_LP.addVar(lb=0, ub=dmd_max, vtype=GRB.CONTINUOUS, name='x_' + str(i))
 
-    for i in range(link_num):
-        for j in range(flow_num):
-            # 下界lb为0，上界ub为正无穷，变量类型vtype为连续型，变量名称name为x0和x1
-            x[i][j] = initial_LP.addVar(lb=0, ub=dmd_max, vtype=gp.GRB.CONTINUOUS, name=str(i)+"th link and "+str(j)+"th flow")
-            # x[i][j] = initial_LP.addVar(lb=0, ub=dmd_max, vtype=GRB.INTEGER,
-            #                             name=str(i) + "th link and " + str(j) + "th flow")
 
+    for i in range(flow_cnt):
+        # 下界lb为0，上界ub为正无穷，变量类型vtype为连续型，变量名称name为x0和x1
+        for j in range(link_cnt):
+            f[i][j] = initial_LP.addVar(lb=0, ub=dmd_max, vtype=gp.GRB.CONTINUOUS,
+                                        name=str(i) + "th flow and " + str(j) + "th link")
 
-    # initial_LP.setObjective(100 * x[0] + 150 * x[1], GRB.MINIMIZE)  # 目标函数，设置为最大化MAXIMIZE
-    # initial_LP.setObjective(
-    #     gp.quicksum(ip_cost[i] * cap[i] * mini_unit  for i in range(link_num)), gp.GRB.MINIMIZE)
-    initial_LP.setObjective(np.sum(x), gp.GRB.MINIMIZE)  # 目标函数，设置为最大化MAXIMIZE
-    # initial_LP.setObjective(gp.quicksum(ip_cost[i] * x[i] for i in range(link_num)), gp.GRB.MINIMIZE)
+        for j in range(4):
+            x[i][j] = initial_LP.addVar(lb=0, ub=dmd_max, vtype=gp.GRB.CONTINUOUS,
+                                        name=str(i) + "th flow and " + str(j) + "th split")
 
+    for i in range(flow_cnt):
+        for j in range(4):
+            if j >= len(my_path[i]):
+                initial_LP.addConstr(x[i][j] == 0)
 
+        initial_LP.addConstr(np.sum(x[i]) == my_flow["dmd"][i])
 
+    initial_LP.setObjective(
+        gp.quicksum(ip_cost[i] for i in range(link_cnt // 2)), gp.GRB.MINIMIZE)
 
+    ## calculate f[i][j]: the allocated data rate for i^th flow on j^th link
+    for i in range(flow_cnt):
+        # by link index
+        split1_link_list = []
+        split2_link_list = []
+        split3_link_list = []
+        split4_link_list = []
+        for m in range(link_cnt):
+            link_set = []
+            this_from = my_link["from"][m]
+            this_to = my_link["to"][m]
+            split_cnt = 0
+            for split in range(len(my_path[i])):
+                split_cnt += 1
+                for imm in range(len(my_path[i][split]) - 1):
+                    if this_from == my_path[i][split][imm] and this_to == my_path[i][split][imm + 1]:
+                        if split_cnt == 1:
+                            split1_link_list.append(m)
+                            link_set.append(0)
+                        elif split_cnt == 2:
+                            split2_link_list.append(m)
+                            link_set.append(1)
+                        elif split_cnt == 3:
+                            split3_link_list.append(m)
+                            link_set.append(2)
+                        elif split_cnt == 4:
+                            split4_link_list.append(m)
+                            link_set.append(3)
+            initial_LP.addConstr(gp.quicksum(x[i][t] for t in link_set) == f[i][m])
 
-    # initial_LP.addConstr(2 * x[0] + x[1] <= 10)  # 约束条件1
-    # initial_LP.addConstr(3 * x[0] + 6 * x[1] <= 40)  # 约束条件2
-    # initial_LP.addConstr(2 * x[0][0] + x[1][0] >= 10)
-    for i in range(link_num):
+    for i in range(link_cnt // 2):
         # for j in range(flow_cnt):
-        #     initial_LP.addConstr(x[i][j] <= my_link["cap"][i])
-        # initial_LP.addConstr(np.sum(x[i]) <= my_link["cap"][i])
-        initial_LP.addConstr(np.sum(x[i]) <= allocated_capacity[i])
+        # initial_LP.addConstr(x[i][j] <= cap[i])
 
-    for j in range(flow_num):
-        curr_src = my_flow["src"][j]
-        curr_dst = my_flow["dst"][j]
-        curr_dmd = my_flow["dmd"][j]
+        initial_LP.addConstr(gp.quicksum(f[s][2 * i] + f[s][2 * i + 1] for s in range(flow_cnt)) <= allocated_capacity[i])
+        # initial_LP.addConstr(cap[i] * mini_unit  <= U[i] * capacity_per_fiber)
 
-        a = 0
-        b = 0
-        if len(out_dict[str(curr_src)]) > 0:
-            for s in out_dict[str(curr_src)]:
-                a += x[s][j]
-        if len(in_dict[str(curr_src)]) > 0:
-            for s in in_dict[str(curr_src)]:
-                b += x[s][j]
+    # for i in range(link_cnt // 2):
+    #     # if link_cnt % 2 == 0:
+    #     #     initial_LP.addConstr(cap[i] * mini_unit + cap[(i + 1) % link_cnt] * mini_unit <= U[i] * capacity_per_fiber)
+    #     # initial_LP.addConstr(cap[i] * mini_unit  <= U[i] * capacity_per_fiber)
+    #     initial_LP.addConstr(cap[i] * mini_unit <= max_fiber * capacity_per_fiber)
 
-
-        initial_LP.addConstr(a-b==my_flow["dmd"][j])
-
-        a = 0
-        b = 0
-        if len(out_dict[str(curr_dst)]) > 0:
-            for s in out_dict[str(curr_dst)]:
-                a += x[s][j]
-        if len(in_dict[str(curr_dst)]) > 0:
-            for s in in_dict[str(curr_dst)]:
-                b += x[s][j]
-
-        initial_LP.addConstr(b - a == my_flow["dmd"][j])
-
-        for other_node in my_node:
-            if other_node is not curr_src and other_node is not curr_dst:
-                a = 0
-                b = 0
-                if len(out_dict[str(other_node)]) > 0:
-                    for s in out_dict[str(other_node)]:
-                        a += x[s][j]
-                if len(in_dict[str(other_node)]) > 0:
-                    for s in in_dict[str(other_node)]:
-                        b += x[s][j]
-
-                initial_LP.addConstr(a - b == 0)
-    # try:
-    #     initial_LP.optimize()  # 调用求解器
-    #     return True
-    # except:
-    #     return False
-
-    initial_LP.optimize()
+    initial_LP.optimize()  # 调用求解器
 
     try:
         print(initial_LP.ObjVal)
         return True
     except:
         return False
+
 
 
  
@@ -736,7 +803,7 @@ class Blip2Llama(Blip2Base):
 
 
         print(graphs.text)
-        output_flatten = outputs.hidden_states[0].reshape((len(query_tokens),-1))
+        output_flatten = outputs.hidden_states[-1].reshape((len(query_tokens),-1))
 
         final = self.action_head(output_flatten)
 
@@ -808,63 +875,86 @@ class Blip2Llama(Blip2Base):
             # print("x:")
             # print(graphs.x)
 
-            xx = [[0 for _ in range(3)] for _ in range(link_num)]
+            xx = [[0 for _ in range(3)] for _ in range(link_num//2)]
             graphs.x = torch.tensor(xx, dtype=torch.long).to(device)
             graphs.edge_index, transformed_edge_num = transformed_edge_index(link_num, my_link)
             graphs.edge_index = graphs.edge_index.to(device)
             graphs.edge_attr = torch.tensor([[0, 0, 1] for _ in range(transformed_edge_num)], dtype=torch.long).to(device)
-            graphs.batch = torch.tensor([0 for _ in range(link_num)], dtype=torch.long).to(device)
+            graphs.batch = torch.tensor([0 for _ in range(link_num//2)], dtype=torch.long).to(device)
 
             # graph_embeds, graph_masks, _ = self.graph_encoder(graphs)
             ## graph_embeds.shape: torch.Size([1, 80, 300])
 
-            allocated_capacity = [0 for i in range(link_num)]
+            allocated_capacity = [0 for i in range(link_num//2)]
 
             total_cost = 0
             ## three features: 已经占了多少比例（动态变化）；预计flow占多少比例（可以超过100%）；normalized ip cost
             ## third feature
-            for j in range(link_num):
+            for j in range(link_num//2):
                 graphs.x[j][2] = ip_cost[j]
                 cc = my_level(graphs.x[j][2], np.min(ip_cost), np.max(ip_cost), level_c)
                 graphs.x[j][2] = cc
 
+            # # second feature
+            # Gbase = nx.DiGraph()
+            # Gbase.add_nodes_from(my_node)
+            # edge_list = []
+            # for i in range(len(from_list)):
+            #     edge_list.append((from_list[i], to_list[i]))
+            # Gbase.add_edges_from(edge_list)
+            # for i in range(flow_num):
+            #     curr_flow = i
+            #     path = nx.dijkstra_path(Gbase, source=my_flow["src"][curr_flow], target=my_flow["dst"][curr_flow])
+            #     for node in range(len(path) - 1):
+            #         a = path[node]
+            #         b = path[node + 1]
+            #         for s in range(len(from_list)):
+            #             if a == from_list[s] and b == to_list[s]:
+            #                 graphs.x[s][1] += my_flow["dmd"][curr_flow]
+
             # second feature
-            Gbase = nx.DiGraph()
-            Gbase.add_nodes_from(my_node)
-            edge_list = []
-            for i in range(len(from_list)):
-                edge_list.append((from_list[i], to_list[i]))
-            Gbase.add_edges_from(edge_list)
             for i in range(flow_num):
                 curr_flow = i
-                path = nx.dijkstra_path(Gbase, source=my_flow["src"][curr_flow], target=my_flow["dst"][curr_flow])
-                for node in range(len(path) - 1):
-                    a = path[node]
-                    b = path[node + 1]
-                    for s in range(len(from_list)):
-                        if a == from_list[s] and b == to_list[s]:
-                            graphs.x[s][1] += my_flow["dmd"][curr_flow]
-            b_list = []
-            for i in range(link_num):
-                aa = graphs.x[i][1].cpu()
-                b_list.append(aa)
-            b_max = np.max(b_list)
+                # path = nx.dijkstra_path(Gbase, source=my_flow["src"][curr_flow], target=my_flow["dst"][curr_flow])
+                cost_list = []
+                cost_inverse_sum = 0
+                for path_idx in range(len(my_path[curr_flow])):
+                    cost_sum = 0
+                    for node in range(len(my_path[curr_flow][path_idx]) - 1):
+                        a = my_path[curr_flow][path_idx][node]
+                        b = my_path[curr_flow][path_idx][node + 1]
+                        for s in range(len(from_list)):
+                            if a == from_list[s] and b == to_list[s]:
+                                # xx[s // 2][1] += ip_cost[s // 2]
+                                xx[s // 2][1] += my_flow["dmd"][curr_flow]
+                                break
+                    break
+
+            # b_list = []
+            # for i in range(link_num//2):
+            #     aa = xx[i][1].cpu()
+            #     b_list.append(aa)
+
+
+
+            # b_max = np.max(b_list)
+            b_max = max_fiber*capacity_per_fiber
 
             ## Added
-            for i in range(link_num):
+            for i in range(link_num//2):
                 # if graphs.x[i][1] % mini_unit == 0:
                 #     allocated_capacity[i] = graphs.x[i][1]
                 # else:
                 # allocated_capacity[i] = graphs.x[i][1] - (graphs.x[i][1]%mini_unit) + mini_unit
                 # allocated_capacity[i] = graphs.x[i][1] - (graphs.x[i][1] % mini_unit)
                 # allocated_capacity[i] = graphs.x[i][1]
-                if graphs.x[i][1] >= max_fiber*capacity_per_fiber:
+                if xx[i][1] >= max_fiber*capacity_per_fiber:
                     allocated_capacity[i] = max_fiber * capacity_per_fiber
                 total_cost += allocated_capacity[i]*ip_cost[i]
 
 
-            for i in range(link_num):
-                bb = my_level(graphs.x[i][1], 0, b_max, level_b)
+            for i in range(link_num//2):
+                bb = my_level(xx[i][1], 0, b_max, level_b)
                 graphs.x[i][1] = bb
 
 
@@ -878,7 +968,7 @@ class Blip2Llama(Blip2Base):
 
             cand_list = []
             ## our generation
-            for i in range(link_num):
+            for i in range(link_num//2):
                 ## 很可能会要activated
                 if graphs.x[i][1] > 0:
                     cand_list.append(i)
@@ -888,14 +978,20 @@ class Blip2Llama(Blip2Base):
 
             action_cnt = 0
 
-            while not my_solver_LP(my_flow, my_link, my_node, link_num, flow_num, dmd_max, allocated_capacity):
+
+
+            while not my_solver_LP(ip_cost,my_flow, my_link, my_node, link_num, flow_num, dmd_max, my_path, allocated_capacity):
 
                 ## candidate generation for each step
                 ## no-filtering generation
                 cand_list = []
-                for i in range(link_num):
+                for i in range(link_num//2):
                     if allocated_capacity[i] < max_fiber * capacity_per_fiber:
-                        cand_list.append(i)
+                        # if (my_link["from"][2*i], my_link["to"][2*i]) in used_set or (my_link["from"][2*i+1], my_link["to"][2*i+1]) in used_set:
+                        if max_link_list[i] > 0 and allocated_capacity[i] < max_link_list[i]:
+                            cand_list.append(i)
+                print(max_link_list)
+                print(cand_list)
 
                 ## our generation
 
@@ -922,7 +1018,7 @@ class Blip2Llama(Blip2Base):
                 # print("Length of cand_list "+ str(len(cand_list)))
 
                 if test_mood:
-                    cand_list = [i for i in range(link_num)]
+                    cand_list = [i for i in range(link_num//2)]
 
 
 
@@ -986,7 +1082,7 @@ class Blip2Llama(Blip2Base):
                         #
                         # exit(0)
 
-                        output_flatten = outputs.hidden_states[0].reshape((1, -1))
+                        output_flatten = outputs.hidden_states[-1].reshape((1, -1))
 
                         final = self.action_head(output_flatten)
 
@@ -1049,7 +1145,7 @@ class Blip2Llama(Blip2Base):
                         output_hidden_states=True,
                         # labels=targets,
                     )
-                    output_flatten = outputs.hidden_states[0].reshape((1, -1))
+                    output_flatten = outputs.hidden_states[-1].reshape((1, -1))
                     final = self.action_head(output_flatten)
                     my_action = []
                     for i in range(1):
