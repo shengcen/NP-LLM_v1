@@ -12,7 +12,11 @@ import datetime
 
 def my_level(raw, min_val, max_val, num):
     final = 0
+
     gran = (max_val-min_val)/num
+
+    if gran == 0:
+        return 0
 
     final = (raw // gran) - (min_val // gran)
     if final > num-1:
@@ -75,38 +79,32 @@ test_mood = False
 v2_mood = True
 is_training = True
 window_size = 2
-per_network_sample = 1500
+per_network_sample = 300
 # per_network_sample = 16
 level_a = 7
 level_b = 30
 level_c = 10
+# level_c = 1
 
-## 1: RANDOM  2: DESCENDING  3: SP上的占有率
-MOOD = 3
 
-# initial_LP = gp.Model()
 
 fiber_cost = []
 ip_cost = []
 
+## train
+# flow_num = 2
+# node_num = 7
+# link_num = 30
 
-# flow_num = 100
-# node_num = 30
-# link_num = 200
+# ## opt: 87500
+# flow_num = 30
+# node_num = 15
+# link_num = 100
 
 
-
-
-
-# ## 229000
-# flow_num = 20
-# node_num = 20
-# link_num = 80
-
-## 355000
-flow_num = 30
-node_num = 20
-link_num = 80
+flow_num = 2
+node_num = 30
+link_num = 300
 
 
 
@@ -119,368 +117,467 @@ max_fiber = 3
 capacity_per_fiber = 1000
 
 
-SEED_A = 3
+# SEED_A = 3
+# SEED_A = 2
+
+training_data = []
+
+for mm in range(1,6):
+    # if not mm==3:
+    if mm > -1:
+        # random.seed(time.time())
+        # flow_num = random.randint(20,30)
+        # print(mm)
+        # flow_list = [10, 10, 10, 10, 10, 10]
+        # flow_num = flow_list[mm]
+
+        SEED_A = mm
+
+        # fiber_cost = 100
+        random.seed(SEED_A)
+
+        from_list = []
+        to_list = []
+        overall_list = []
+
+
+        i = 0
+        while i < link_num:
+            my_from = random.randint(0, node_num-1)
+            my_to = random.randint(0, node_num-1)
+            if my_to == my_from:
+                my_to = (my_to + 1) % node_num
+            if ([my_from, my_to] not in overall_list) and ([my_to, my_from] not in overall_list):
+                overall_list.append([my_from,my_to])
+                overall_list.append([my_to, my_from])
+                from_list.append(my_from)
+                to_list.append(my_to)
+                from_list.append(my_to)
+                to_list.append(my_from)
+                i += 2
+        # exit(0)
+
+        # for i in range(node_num):
+        #     for _ in range(node_num-1):
+        #         from_list.append(i)
+        #
+        # for i in range(node_num):
+        #     for j in range(node_num):
+        #         if not (j == i):
+        #             to_list.append(j)
+
+
+
+
+        ## fiber cost 在那个范围之间分布
+        for i in range(link_num//2):
+            # random.seed(time.time())
+            # fiber_cost.append(random.randint(100,200))
+            # fiber_cost.append(0)
+            ip_cost.append(random.randint(1,10))
+            ## 双向ip cost相等
+            # ip_cost.append(1)
+
+
+
+
+        src_list = []
+        dst_list = []
+        dmd_list = []
+
+
+
+        for i in range(flow_num):
+            # random.seed(time.time())
+
+            src_list.append(random.randint(0, node_num-1))
+            # random.seed(time.time())
+
+            aa = random.randint(0, node_num - 1)
+
+            if aa == src_list[i]:
+                aa = (aa + 1)%node_num
+            dst_list.append(aa)
+            # random.seed(time.time())
+            ## dmd 在哪些地方 浮动
+            dmd_list.append(random.randint(100, 2000))
+            # dmd_list.append(1000)
+
+            # print(src_list[i])
+            # print(dst_list[i])
+
+        # exit(0)
+
+
+
+        # my_flow = {"src":[4,3,1,8,7,3,2,4,9,6,5,4,9,11, 0,1,2,3,4,2,1,2,4,3,3,1,8,3], "dst":[0,1,2,3,4,2,1,2,4,3,3,1,8,3,4,3,1,8,7,3,2,4,9,6,5,4,9,11],
+        #            "dmd": [300,400,2000,200,1000.5,1200.5,1800,400,1500,2000,100,600,200,1000, 300,400,2000,200,1000.5,1200.5,1800,400,1500,2000,100,600,200,1000]}
+        my_flow = {"src":src_list, "dst":dst_list,
+                   "dmd": dmd_list}
+        # 双向的link
+        # my_link = {"from":from_list, "to":to_list, "cap": [2000 for i in range(node_num*(node_num-1))]}
+        my_link = {"from":from_list, "to":to_list}
+        my_node = list(range(node_num))
+
+        ## abandoned
+
+
+        out_dict = {}
+
+        for i in range(len(my_node)):
+            out_dict[str(i)] = []
+            out_link_idx = []
+            for link_idx in range(len(my_link["from"])):
+                if my_link["from"][link_idx] == i:
+                    out_link_idx.append(link_idx)
+            out_dict[str(i)] = out_link_idx
+
+        in_dict = {}
+
+        for i in range(len(my_node)):
+            in_dict[str(i)] = []
+            in_link_idx = []
+            for link_idx in range(len(my_link["to"])):
+                if my_link["to"][link_idx] == i:
+                    in_link_idx.append(link_idx)
+            in_dict[str(i)] = in_link_idx
+
+        ## new
+        my_path = []
+        Gbase = nx.DiGraph()
+        Gbase.add_nodes_from(my_node)
+        edge_list = []
+        for i in range(len(from_list)):
+            # edge_list.append((from_list[i],to_list[i]))
+            Gbase.add_weighted_edges_from([(from_list[i],to_list[i],{'weight':ip_cost[i//2]})])
+
+        def get_k_shortest_paths(graph, source, target, k):
+            paths = nx.shortest_simple_paths(graph, source, target)
+            shortest_paths = []
+            for path in paths:
+                shortest_paths.append(path)
+                if len(shortest_paths) == k:
+                    break
+            return shortest_paths
+
+
+        # my_path: [[[a,b],[b,c],]
+        for i in range(flow_num):
+            my_path.append([])
+            curr_flow = i
+            k_shortest_paths = get_k_shortest_paths(Gbase, source=my_flow["src"][curr_flow], target=my_flow["dst"][curr_flow],k=4)
+            for i, path in enumerate(k_shortest_paths):
+                my_path[-1].append(path)
+
+
+
+
+        cost_list = []
+
+
+
+        Gbase = nx.DiGraph()
+        Gbase.add_nodes_from(my_node)
+        edge_list = []
+        for i in range(len(from_list)):
+            edge_list.append((from_list[i],to_list[i]))
+        Gbase.add_edges_from(edge_list)
+
+        flow_seq = list(range(flow_num))
+
+        raw_x_list = [[0 for _ in range(3)] for _ in range(link_num//2)]
+        smiles = ''
+
+        ## three features: 已经占了多少比例（动态变化）；预计flow占多少比例（可以超过100%）；normalized ip cost
+
+        ## third feature
+        for j in range(link_num//2):
+            raw_x_list[j][2] = ip_cost[j]
+
+
+        # second feature
+        for i in range(flow_num):
+            curr_flow = i
+            # path = nx.dijkstra_path(Gbase, source=my_flow["src"][curr_flow], target=my_flow["dst"][curr_flow])
+            cost_list = []
+            cost_inverse_sum = 0
+            for path_idx in range(len(my_path[curr_flow])):
+                cost_sum = 0
+                for node in range(len(my_path[curr_flow][path_idx])-1):
+                    a = my_path[curr_flow][path_idx][node]
+                    b = my_path[curr_flow][path_idx][node + 1]
+                    for s in range(len(from_list)):
+                        if a == from_list[s] and b == to_list[s]:
+                            # raw_x_list[s//2][1] += ip_cost[s//2]
+                            raw_x_list[s // 2][1] += my_flow["dmd"][curr_flow]
+                            break
+                break
+
+        # for i in range(flow_num):
+        #     curr_flow = i
+        #     # path = nx.dijkstra_path(Gbase, source=my_flow["src"][curr_flow], target=my_flow["dst"][curr_flow])
+        #     cost_list = []
+        #     cost_inverse_sum = 0
+        #     for path_idx in range(len(my_path[curr_flow])):
+        #         cost_sum = 0
+        #         for node in range(len(my_path[curr_flow][path_idx])-1):
+        #             a = my_path[curr_flow][path_idx][node]
+        #             b = my_path[curr_flow][path_idx][node + 1]
+        #             for s in range(len(from_list)):
+        #                 if a == from_list[s] and b == to_list[s]:
+        #                     cost_sum += ip_cost[s//2]
+        #                     break
+        #         cost_list.append(cost_sum)
+        #         for m in range(len(cost_list)):
+        #             cost_inverse_sum += (1/cost_list[m])
+        #
+        #     for path_idx in range(len(my_path[curr_flow])):
+        #         for node in range(len(my_path[curr_flow][path_idx]) - 1):
+        #             a = my_path[curr_flow][path_idx][node]
+        #             b = my_path[curr_flow][path_idx][node + 1]
+        #             for s in range(len(from_list)):
+        #                 if a == from_list[s] and b == to_list[s]:
+        #                     raw_x_list[s//2][1] += ((1/cost_list[path_idx])/cost_inverse_sum*my_flow["dmd"][curr_flow])
+        #                     break
 
 
 
 
 
+        ## transformed edges
+        edge_index_from = []
+        edge_index_to = []
 
+        # for s in range(link_num):
+        #     target = my_link["to"][s]
+        #     for cand in range(link_num):
+        #         if (not (s == cand)) and target == my_link["from"][cand]:
+        #             edge_index_from.append(s)
+        #             edge_index_to.append(cand)
 
-# fiber_cost = 100
-random.seed(SEED_A)
-
-from_list = []
-to_list = []
-overall_list = []
-
-
-i = 0
-while i < link_num:
-    my_from = random.randint(0, node_num-1)
-    my_to = random.randint(0, node_num-1)
-    if my_to == my_from:
-        my_to = (my_to + 1) % node_num
-    if [my_from, my_to] not in overall_list:
-        overall_list.append([my_from,my_to])
-        from_list.append(my_from)
-        to_list.append(my_to)
-        i += 1
-# exit(0)
-
-# for i in range(node_num):
-#     for _ in range(node_num-1):
-#         from_list.append(i)
-#
-# for i in range(node_num):
-#     for j in range(node_num):
-#         if not (j == i):
-#             to_list.append(j)
+        for s in range(link_num//2):
+            for j in range(link_num//2):
+                if not (s==j):
+                    node_a = my_link["from"][s*2]
+                    node_b = my_link["to"][s * 2]
+                    node_c = my_link["from"][j * 2]
+                    node_d = my_link["to"][j * 2]
+                    if (node_a==node_c) or (node_a==node_d) or (node_b==node_c) or (node_b==node_d):
+                        edge_index_from.append(s)
+                        edge_index_to.append(j)
 
 
 
-
-## fiber cost 在那个范围之间分布
-for i in range(len(from_list)):
-    # random.seed(time.time())
-    # fiber_cost.append(random.randint(100,200))
-    fiber_cost.append(0)
-    ip_cost.append(random.randint(1,10))
+        edge_index = [edge_index_from, edge_index_to]
 
 
 
-src_list = []
-dst_list = []
-dmd_list = []
+        if is_training:
 
+            b_list = []
+            for i in range(link_num//2):
+                b_list.append(raw_x_list[i][1])
+            # b_max = np.max(b_list)
+            b_max = max_fiber*capacity_per_fiber
 
-
-for i in range(flow_num):
-    # random.seed(time.time())
-
-    src_list.append(random.randint(0, node_num-1))
-    # random.seed(time.time())
-
-    aa = random.randint(0, node_num - 1)
-
-    if aa == src_list[i]:
-        aa = (aa + 1)%node_num
-    dst_list.append(aa)
-    # random.seed(time.time())
-    ## dmd 在哪些地方 浮动
-    dmd_list.append(random.randint(100, 2000))
-
-    # print(src_list[i])
-    # print(dst_list[i])
-
-# exit(0)
-
-
-
-# my_flow = {"src":[4,3,1,8,7,3,2,4,9,6,5,4,9,11, 0,1,2,3,4,2,1,2,4,3,3,1,8,3], "dst":[0,1,2,3,4,2,1,2,4,3,3,1,8,3,4,3,1,8,7,3,2,4,9,6,5,4,9,11],
-#            "dmd": [300,400,2000,200,1000.5,1200.5,1800,400,1500,2000,100,600,200,1000, 300,400,2000,200,1000.5,1200.5,1800,400,1500,2000,100,600,200,1000]}
-my_flow = {"src":src_list, "dst":dst_list,
-           "dmd": dmd_list}
-# 双向的link
-# my_link = {"from":from_list, "to":to_list, "cap": [2000 for i in range(node_num*(node_num-1))]}
-my_link = {"from":from_list, "to":to_list}
-my_node = list(range(node_num))
-
-## abandoned
-
-
-out_dict = {}
-
-for i in range(len(my_node)):
-    out_dict[str(i)] = []
-    out_link_idx = []
-    for link_idx in range(len(my_link["from"])):
-        if my_link["from"][link_idx] == i:
-            out_link_idx.append(link_idx)
-    out_dict[str(i)] = out_link_idx
-
-in_dict = {}
-
-for i in range(len(my_node)):
-    in_dict[str(i)] = []
-    in_link_idx = []
-    for link_idx in range(len(my_link["to"])):
-        if my_link["to"][link_idx] == i:
-            in_link_idx.append(link_idx)
-    in_dict[str(i)] = in_link_idx
-
-
-
-cost_list = []
-
-
-
-Gbase = nx.DiGraph()
-Gbase.add_nodes_from(my_node)
-edge_list = []
-for i in range(len(from_list)):
-    edge_list.append((from_list[i],to_list[i]))
-Gbase.add_edges_from(edge_list)
-
-flow_seq = list(range(flow_num))
-
-raw_x_list = [[0 for _ in range(3)] for _ in range(link_num)]
-smiles = ''
-
-## three features: 已经占了多少比例（动态变化）；预计flow占多少比例（可以超过100%）；normalized ip cost
-
-## third feature
-for j in range(link_num):
-    raw_x_list[j][2] = ip_cost[j]
-
-# second feature
-for i in range(flow_num):
-    curr_flow = i
-    path = nx.dijkstra_path(Gbase, source=my_flow["src"][curr_flow], target=my_flow["dst"][curr_flow])
-    for node in range(len(path) - 1):
-        a = path[node]
-        b = path[node + 1]
-        for s in range(len(from_list)):
-            if a == from_list[s] and b == to_list[s]:
-                raw_x_list[s][1] += my_flow["dmd"][curr_flow]
-
-## transformed edges
-edge_index_from = []
-edge_index_to = []
-
-for s in range(link_num):
-    target = my_link["to"][s]
-    for cand in range(link_num):
-        if (not (s == cand)) and target == my_link["from"][cand]:
-            edge_index_from.append(s)
-            edge_index_to.append(cand)
-
-edge_index = [edge_index_from, edge_index_to]
-
-
-if is_training:
-
-    b_list = []
-    for i in range(link_num):
-        b_list.append(raw_x_list[i][1])
-    b_max = np.max(b_list)
+            # print(b_max)
+            # exit(0)
 
 
 
 
-    ## first feature: 需要尝试不同分配情况
-    opt_cap = my_solver_ILP(my_flow, my_link, my_node,dmd_max,max_fiber,capacity_per_fiber,mini_unit)
-    for i in range(len(opt_cap)):
-        opt_cap[i] = opt_cap[i] * mini_unit
-
-    training_data = []
-
-    for sam in range(per_network_sample):
-
-        cand_list = [i for i in range(len(opt_cap))]
-        ## false sample, 也就是不需要加的
-        false_list = random.sample(cand_list, window_size-1)
-        ## true sample, 也就是需要加的
-        true_cand_list = []
-        for i in range(len(cand_list)):
-            if opt_cap[i] > 0:
-                true_cand_list.append(i)
-        true_list = random.sample(true_cand_list, 1)
+            ## first feature: 需要尝试不同分配情况
+            opt_cap = my_solver_ILP(ip_cost,my_flow, my_link, my_node,dmd_max,max_fiber,capacity_per_fiber,mini_unit,my_path)
+            for i in range(len(opt_cap)):
+                opt_cap[i] = opt_cap[i] * mini_unit
 
 
-        for i in range(len(cand_list)):
-            if i in false_list:
-                raw_x_list[i][0] = opt_cap[i]
-            elif i in true_list:
+
+            for sam in range(per_network_sample):
+
+                cand_list = [i for i in range(len(opt_cap))]
+                ## false sample, 也就是不需要加的
+                false_list = random.sample(cand_list, window_size-1)
+                ## true sample, 也就是需要加的
+                true_cand_list = []
+                for i in range(len(cand_list)):
+                    if opt_cap[i] > 0:
+                        true_cand_list.append(i)
+                true_list = random.sample(true_cand_list, 1)
+
+
+                for i in range(len(cand_list)):
+                    if i in false_list:
+                        raw_x_list[i][0] = opt_cap[i]
+                    elif i in true_list:
+                        random.seed(datetime.datetime.now())
+                        raw_x_list[i][0] = random.randint(0,opt_cap[i]/mini_unit-1) * mini_unit
+                    else:
+                        random.seed(datetime.datetime.now())
+                        # print(raw_x_list)
+                        # print(i)
+                        raw_x_list[i][0] = random.randint(0, opt_cap[i] / mini_unit) * mini_unit
+
                 random.seed(datetime.datetime.now())
-                raw_x_list[i][0] = random.randint(0,opt_cap[i]/mini_unit-1) * mini_unit
-            else:
-                random.seed(datetime.datetime.now())
-                # print(raw_x_list)
-                # print(i)
-                raw_x_list[i][0] = random.randint(0, opt_cap[i] / mini_unit) * mini_unit
 
-        random.seed(datetime.datetime.now())
+                true_pos = random.randint(0,window_size-1)
 
-        true_pos = random.randint(0,window_size-1)
+                # print(true_pos)
 
-        # print(true_pos)
+                cand = false_list
+                cand.insert(true_pos,true_list[0])
 
-        cand = false_list
-        cand.insert(true_pos,true_list[0])
-
-        if v2_mood:
-            cand_list = [i for i in range(len(opt_cap))]
-            cand = random.sample(cand_list, window_size)
-            diff_list = []
-            for m in range(link_num):
-                raw_x_list[m][0] = random.randint(0, opt_cap[i] / mini_unit) * mini_unit
-            for j in range(window_size):
-                i = cand[j]
-                diff_list.append(opt_cap[i] - raw_x_list[i][0])
-            true_pos = np.argmax(diff_list)
-            print(true_pos)
+                if v2_mood:
+                    cand_list = [i for i in range(len(opt_cap))]
+                    cand = random.sample(cand_list, window_size)
+                    diff_list = []
+                    for m in range(link_num//2):
+                        raw_x_list[m][0] = random.randint(0, opt_cap[i] / mini_unit) * mini_unit
+                    for j in range(window_size):
+                        i = cand[j]
+                        diff_list.append(opt_cap[i] - raw_x_list[i][0])
+                    true_pos = np.argmax(diff_list)
+                    # print(true_pos)
 
 
 
-        if test_mood:
-            cand_cand = [i for i in range(link_num)]
-            cand = random.sample(cand_cand, window_size)
-            cand_ip_list = []
-            for i in range(len(cand)):
-                cand_ip_list.append(ip_cost[cand[i]])
-            true_pos = np.argmin(cand_ip_list)
+                if test_mood:
+                    cand_cand = [i for i in range(link_num)]
+                    cand = random.sample(cand_cand, window_size)
+                    cand_ip_list = []
+                    for i in range(len(cand)):
+                        cand_ip_list.append(ip_cost[cand[i]])
+                    true_pos = np.argmin(cand_ip_list)
+                    for i in range(link_num):
+                        raw_x_list[i][0] = 0
+
+
+
+
+                text = ""
+                if true_pos == 0:
+                    text = "One."
+                elif true_pos == 1:
+                    text = "Two."
+                elif true_pos == 2:
+                    text = "Three."
+                elif true_pos == 3:
+                    text = "Four."
+                elif true_pos == 4:
+                    text = "Five."
+                elif true_pos == 5:
+                    text = "Six."
+                elif true_pos == 6:
+                    text = "Seven."
+                elif true_pos == 7:
+                    text = "Eight."
+                elif true_pos == 8:
+                    text = "Nine."
+                elif true_pos == 9:
+                    text = "Ten."
+
+
+
+
+
+                for i in range(len(opt_cap)):
+                    aa = my_level(raw_x_list[i][0], 0, max_fiber*capacity_per_fiber, level_a)
+                    raw_x_list[i][0] = aa
+
+                    if sam == 0:
+                        bb = my_level(raw_x_list[i][1], 0, b_max, level_b)
+                        raw_x_list[i][1] = bb
+
+                        cc = my_level(raw_x_list[i][2], np.min(ip_cost), np.max(ip_cost), level_c)
+                        raw_x_list[i][2] = cc
+
+
+                x = torch.tensor(raw_x_list, dtype=torch.long)
+
+
+
+
+                edge_index = torch.tensor(edge_index,dtype=torch.long)
+
+                edge_attr = torch.tensor([[0, 0, 1] for _ in range(len(edge_index_from))], dtype=torch.long)
+
+                training_data.append(
+                    Data(x=x, edge_index=edge_index, edge_attr=edge_attr, smiles=smiles, text=text, cand=cand))
+
+
+
+
+        else:
+            b_list = []
             for i in range(link_num):
-                raw_x_list[i][0] = 0
+                b_list.append(raw_x_list[i][1])
+            b_max = np.max(b_list)
 
+            training_data = []
 
+            for sam in range(per_network_sample):
 
+                cand_list = [i for i in range(link_num)]
+                ## false sample, 也就是不需要加的
+                false_list = random.sample(cand_list, window_size - 1)
+                ## true sample, 也就是需要加的
+                # true_cand_list = []
+                # for i in range(len(cand_list)):
+                #     if opt_cap[i] > 0:
+                #         true_cand_list.append(i)
+                true_list = random.sample(cand_list, 1)
 
-        text = ""
-        if true_pos == 0:
-            text = "One."
-        elif true_pos == 1:
-            text = "Two."
-        elif true_pos == 2:
-            text = "Three."
-        elif true_pos == 3:
-            text = "Four."
-        elif true_pos == 4:
-            text = "Five."
-        elif true_pos == 5:
-            text = "Six."
-        elif true_pos == 6:
-            text = "Seven."
-        elif true_pos == 7:
-            text = "Eight."
-        elif true_pos == 8:
-            text = "Nine."
-        elif true_pos == 9:
-            text = "Ten."
+                for i in range(len(cand_list)):
+                    if i in false_list:
+                        raw_x_list[i][0] = 0
+                    elif i in true_list:
+                        random.seed(datetime.datetime.now())
+                        raw_x_list[i][0] = 0
+                    else:
+                        random.seed(datetime.datetime.now())
+                        # print(raw_x_list)
+                        # print(i)
+                        raw_x_list[i][0] = 0
 
-
-
-
-
-        for i in range(len(opt_cap)):
-            aa = my_level(raw_x_list[i][0], 0, max_fiber*capacity_per_fiber, level_a)
-            raw_x_list[i][0] = aa
-
-            if sam == 0:
-                bb = my_level(raw_x_list[i][1], 0, b_max, level_b)
-                raw_x_list[i][1] = bb
-
-                cc = my_level(raw_x_list[i][2], np.min(ip_cost), np.max(ip_cost), level_c)
-                raw_x_list[i][2] = cc
-
-
-        x = torch.tensor(raw_x_list, dtype=torch.long)
-
-
-
-
-        edge_index = torch.tensor(edge_index,dtype=torch.long)
-
-        edge_attr = torch.tensor([[0, 0, 1] for _ in range(len(edge_index_from))], dtype=torch.long)
-
-        training_data.append(
-            Data(x=x, edge_index=edge_index, edge_attr=edge_attr, smiles=smiles, text=text, cand=cand))
-
-
-
-    aaa = myown()
-
-    aaa.process_save(training_data)
-
-else:
-    b_list = []
-    for i in range(link_num):
-        b_list.append(raw_x_list[i][1])
-    b_max = np.max(b_list)
-
-    training_data = []
-
-    for sam in range(per_network_sample):
-
-        cand_list = [i for i in range(link_num)]
-        ## false sample, 也就是不需要加的
-        false_list = random.sample(cand_list, window_size - 1)
-        ## true sample, 也就是需要加的
-        # true_cand_list = []
-        # for i in range(len(cand_list)):
-        #     if opt_cap[i] > 0:
-        #         true_cand_list.append(i)
-        true_list = random.sample(cand_list, 1)
-
-        for i in range(len(cand_list)):
-            if i in false_list:
-                raw_x_list[i][0] = 0
-            elif i in true_list:
                 random.seed(datetime.datetime.now())
-                raw_x_list[i][0] = 0
-            else:
-                random.seed(datetime.datetime.now())
-                # print(raw_x_list)
-                # print(i)
-                raw_x_list[i][0] = 0
 
-        random.seed(datetime.datetime.now())
+                true_pos = random.randint(0, window_size - 1)
 
-        true_pos = random.randint(0, window_size - 1)
+                # print(true_pos)
 
-        # print(true_pos)
+                cand = false_list
+                cand.insert(true_pos, true_list[0])
 
-        cand = false_list
-        cand.insert(true_pos, true_list[0])
-
-        text = "One"
+                text = "One"
 
 
-        for i in range(link_num):
-            aa = my_level(raw_x_list[i][0], 0, max_fiber * capacity_per_fiber, level_a)
-            raw_x_list[i][0] = aa
+                for i in range(link_num):
+                    aa = my_level(raw_x_list[i][0], 0, max_fiber * capacity_per_fiber, level_a)
+                    raw_x_list[i][0] = aa
 
-            if sam==0:
-                bb = my_level(raw_x_list[i][1], 0, b_max, level_b)
-                raw_x_list[i][1] = bb
+                    if sam==0:
+                        bb = my_level(raw_x_list[i][1], 0, b_max, level_b)
+                        raw_x_list[i][1] = bb
 
-                cc = my_level(raw_x_list[i][2], np.min(ip_cost), np.max(ip_cost), level_c)
-                raw_x_list[i][2] = cc
+                        cc = my_level(raw_x_list[i][2], np.min(ip_cost), np.max(ip_cost), level_c)
+                        raw_x_list[i][2] = cc
 
-        x = torch.tensor(raw_x_list, dtype=torch.long)
+                x = torch.tensor(raw_x_list, dtype=torch.long)
 
-        # print(x)
+                # print(x)
 
-        edge_index = torch.tensor(edge_index, dtype=torch.long)
+                edge_index = torch.tensor(edge_index, dtype=torch.long)
 
-        edge_attr = torch.tensor([[0, 0, 1] for _ in range(len(edge_index_from))], dtype=torch.long)
+                edge_attr = torch.tensor([[0, 0, 1] for _ in range(len(edge_index_from))], dtype=torch.long)
 
-        training_data.append(
-            Data(x=x, edge_index=edge_index, edge_attr=edge_attr, smiles=smiles, text=text, cand=cand))
+                training_data.append(
+                    Data(x=x, edge_index=edge_index, edge_attr=edge_attr, smiles=smiles, text=text, cand=cand))
 
-    aaa = myown()
+aaa = myown()
 
-    aaa.process_save(training_data)
+aaa.process_save(training_data)
+
+print(len(training_data))
 
 
 
