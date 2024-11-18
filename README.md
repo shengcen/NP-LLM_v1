@@ -19,7 +19,7 @@ In stage2.py, set "IS_TRAINING"=True;
 In data/my_dataset/my_dataset_writer.py, set is_test=False; ; run python my_dataset_writer.py
 
 
-$$ python stage2.py --root 'data/my_dataset/' --devices '1' --filename "ft_pubchem324k" --opt_model 'llama2_13b_hf' --max_epochs 800 --mode ft --prompt '[START_I_SMILES]{}[END_I_SMILES]. ' --tune_gnn --llm_tune lora --batch_size 8 --inference_batch_size 8
+$$ python stage2.py --root 'data/my_dataset/' --devices '1' --filename "ft_pubchem324k" --opt_model 'llama2_13b_hf' --max_epochs 1600 --mode ft --prompt '[START_I_SMILES]{}[END_I_SMILES]. ' --tune_gnn --llm_tune lora --batch_size 8 --inference_batch_size 8
 
 
 
